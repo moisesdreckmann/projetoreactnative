@@ -41,8 +41,11 @@ function Pizzas({ navigation }) {
     } else {
       const path = response.assets[0].uri;
       const imageUrl = await uploadImageToFirebase(path);
-      if (isEditing) {
-        setSelectedComida({ ...selectedComida, imageUri: imageUrl });
+
+      if (isEditing && selectedComida) {
+        const updatedComida = { ...selectedComida, imageUri: imageUrl };
+        setSelectedComida(updatedComida);  // Atualiza o estado imediatamente
+        await updateComida(updatedComida.id, updatedComida);  // Atualiza no Firestore
       } else {
         setNewComida({ ...newComida, imageUri: imageUrl });
       }
@@ -93,11 +96,18 @@ function Pizzas({ navigation }) {
 
         {comidas.map(comida => (
           <View key={comida.id} style={styles.comidaContainer}>
+            <View style={styles.header}>
+              <Image
+                source={{
+                  uri: comida.imageUri || 'https://firebasestorage.googleapis.com/v0/b/ipizza-aec6e.appspot.com/o/foto.png?alt=media&token=61e34d50-662a-4f90-b476-3f3f7c4ca5fc',
+                }}
+                style={styles.image}
+              />
+            </View>
             <Produto
               nome={comida.nome}
               descricao={comida.descricao}
               valor={Number(comida.valor) || 0}
-              imagem={comida.imageUri || 'https://firebasestorage.googleapis.com/v0/b/ipizza-aec6e.appspot.com/o/foto.png?alt=media&token=61e34d50-662a-4f90-b476-3f3f7c4ca5fc'}
             />
             <TouchableOpacity style={styles.button} onPress={() => startEditing(comida)}>
               <Text style={styles.buttonText}>Alterar</Text>
@@ -105,12 +115,16 @@ function Pizzas({ navigation }) {
             <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={() => handleDeleteComida(comida.id)}>
               <Text style={styles.buttonText}>Deletar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={() => handleImageSelection('camera')}>
-              <Text style={styles.buttonText}>Tirar Foto</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={() => handleImageSelection('library')}>
-              <Text style={styles.buttonText}>Escolher da Galeria</Text>
-            </TouchableOpacity>
+            {isEditing && selectedComida && selectedComida.id === comida.id && (
+              <>
+                <TouchableOpacity style={styles.button} onPress={() => handleImageSelection('camera')}>
+                  <Text style={styles.buttonText}>Tirar Foto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.button} onPress={() => handleImageSelection('library')}>
+                  <Text style={styles.buttonText}>Escolher da Galeria</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         ))}
       </ScrollView>
@@ -216,7 +230,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   image: {
-    width: 150,
+    width: 325,
     height: 150,
     resizeMode: 'cover',
   },
