@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import firestore from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
+import ImageResizer from 'react-native-image-resizer';
 
 const FirestoreContext = createContext();
 
@@ -23,6 +25,35 @@ export const FirestoreProvider = ({ collectionName, children }) => {
     fetchItems();
   }, [collectionName]);
 
+  const uploadImageToFirebase = async (uri) => {
+    try {
+      // Redimensiona a imagem e a converte para PNG
+      const resizedImage = await ImageResizer.createResizedImage(
+        uri,
+        150, // Largura
+        200, // Altura
+        'PNG', // Formato de compressão
+        80 // Qualidade
+      );
+  
+      // Define o caminho do arquivo no Firebase Storage, garantindo que seja um PNG
+      const fileName = `foto.png`;  // define explicitamente o nome do arquivo como 'foto.png'
+      const storageRef = storage().ref(`images/${fileName}`);
+  
+      // Faz o upload da imagem redimensionada
+      await storageRef.putFile(resizedImage.uri);
+  
+      // Obtém a URL de download da imagem
+      const downloadURL = await storageRef.getDownloadURL();
+  
+      console.log('URL da imagem:', downloadURL); // Verifique o URL aqui
+      return downloadURL;
+    } catch (error) {
+      console.error('Erro ao redimensionar ou fazer upload da imagem:', error);
+      throw error;
+    }
+  };
+  
   const createItem = async (newItem) => {
     try {
       const docRef = await firestore().collection(collectionName).add(newItem);
@@ -51,31 +82,8 @@ export const FirestoreProvider = ({ collectionName, children }) => {
     }
   };
 
-  const imagem = async (aluno, urlDevice) => {
-    try {
-       if (urlDevice !== '') {
-        estudante.urlFoto = await sendImageToStorage(urlDevice, estudante);
-         if (!estudante.urlFoto) {
-          return false; //não deixa salvar ou atualizar se não realizar todos os passpos para enviar a imagem para o storage
-         }
-       }
-      await firestore().collection('alunos').doc(aluno.uid).set(
-        {
-          nome: aluno.nome,
-          curso: aluno.curso,
-          urlFoto: aluno.urlFoto,
-        },
-        {merge: true},
-      );
-      return true;
-    } catch (e) {
-      console.error('AlunoProvider, save: ' + e);
-      return false;
-    }
-  };
-
   return (
-    <FirestoreContext.Provider value={{ items, imagem, createItem, updateItem, deleteItem }}>
+    <FirestoreContext.Provider value={{ items, uploadImageToFirebase, createItem, updateItem, deleteItem }}>
       {children}
     </FirestoreContext.Provider>
   );

@@ -4,51 +4,49 @@ import logo from '../assets/logo.png';
 import Produto from '../components/Produto';
 import { useFirestore } from '../context/ContextFirestore';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import storage from '@react-native-firebase/storage';
 
 function Pizzas({ navigation }) {
-  const { items: comidas, createItem: createComida, updateItem: updateComida, deleteItem: deleteComida } = useFirestore('Comidas');
-  const [modalVisible, setModalVisible] = useState(false);
+  const { items: comidas, createItem: createComida, updateItem: updateComida, deleteItem: deleteComida, uploadImageToFirebase } = useFirestore('Comidas');
   const [selectedImage, setSelectedImage] = useState(null);
   const [newComida, setNewComida] = useState({ nome: '', descricao: '', valor: '', imageUri: '' });
   const [selectedComida, setSelectedComida] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  const uploadImageToFirebase = async (uri) => {
-    const fileName = uri.substring(uri.lastIndexOf('/') + 1);
-    const storageRef = storage().ref(`images/${fileName}`);
-    await storageRef.putFile(uri);
-    return await storageRef.getDownloadURL();
-  };
-
   const handleImageSelection = async (type) => {
-    const options = {
-      mediaType: 'photo',
-      quality: 1,
-    };
-
-    let response;
-    if (type === 'camera') {
-      response = await launchCamera(options);
-    } else {
-      response = await launchImageLibrary(options);
-    }
-
-    if (response.didCancel) {
-      ToastAndroid.show('Você cancelou a seleção.', ToastAndroid.LONG);
-    } else if (response.errorCode) {
-      ToastAndroid.show('Erro ao selecionar a imagem.', ToastAndroid.LONG);
-    } else {
-      const path = response.assets[0].uri;
-      const imageUrl = await uploadImageToFirebase(path);
-
-      if (isEditing && selectedComida) {
-        const updatedComida = { ...selectedComida, imageUri: imageUrl };
-        setSelectedComida(updatedComida);  // Atualiza o estado imediatamente
-        await updateComida(updatedComida.id, updatedComida);  // Atualiza no Firestore
+    try {
+      const options = {
+        mediaType: 'photo',
+        quality: 1,
+      };
+  
+      let response;
+      if (type === 'camera') {
+        response = await launchCamera(options);
       } else {
-        setNewComida({ ...newComida, imageUri: imageUrl });
+        response = await launchImageLibrary(options);
       }
+  
+      if (response.didCancel) {
+        ToastAndroid.show('Você cancelou a seleção.', ToastAndroid.LONG);
+      } else if (response.errorCode) {
+        ToastAndroid.show('Erro ao selecionar a imagem.', ToastAndroid.LONG);
+      } else {
+        const path = response.assets[0].uri;
+        const imageUrl = await uploadImageToFirebase(path);
+        
+        if (!imageUrl) throw new Error('Falha no upload da imagem');
+  
+        if (isEditing && selectedComida) {
+          const updatedComida = { ...selectedComida, imageUri: imageUrl };
+          setSelectedComida(updatedComida);  // Atualiza o estado imediatamente
+          await updateComida(updatedComida.id, updatedComida);  // Atualiza no Firestore
+        } else {
+          setNewComida({ ...newComida, imageUri: imageUrl });
+        }
+      }
+    } catch (error) {
+      console.error("Erro na seleção ou upload de imagem: ", error);
+      ToastAndroid.show('Erro ao processar a imagem. Tente novamente.', ToastAndroid.LONG);
     }
   };
 
